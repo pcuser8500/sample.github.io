@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>トランシーバー</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.webrtc.ecl.ntt.com/skyway-4.4.4.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>トランシーバー</h1>
+  <button id="talkBtn">話す</button>
+  <div id="status">接続中...</div>
+
+  <script>
+    const SKYWAY_API_KEY = '18a3cd31-d2ef-45f0-b675-1584a5a44829';
+    const ROOM_NAME = 'culture-fes-room';
+
+    const talkBtn = document.getElementById('talkBtn');
+    const status = document.getElementById('status');
+
+    let localStream;
+    let peer;
+    let room;
+    let myId = 'user_' + Math.random().toString(36).substr(2, 9);
+    let isTalking = false;
+    let currentTalker = null;
+    let isConnected = false;
+
+    async function getStream() {
+      return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    }
+
+    async function init() {
+      localStream = await getStream();
+      peer = new SkyWay.Peer({ key: SKYWAY_API_KEY });
+
+      peer.on('open', () => {
+        room = peer.joinRoom(ROOM_NAME, {
+          mode: 'sfu',
+          stream: localStream
+        });
+
+        room.on('stream', remoteStream => {
+          const audio = new Audio();
+          audio.srcObject = remoteStream;
+          audio.play();
+        });
+
+        room.on('open', () => {
+          isConnected = true;
+          status.textContent = '接続完了';
+        });
+
+        room.on('data', ({ src, data }) => {
+          if (data.type === 'talker') {
+            currentTalker = data.id;
+          }
+        });
+
+        setInterval(() => {
+          room.send({ type: 'who' });
+        }, 1000);
+      });
+    }
+
+    function sendTalker(id) {
+      if (room) {
+        room.send({ type: 'talker', id });
+      }
+    }
+
+    function startTalking() {
+      if (!currentTalker || currentTalker === myId) {
+        localStream.getAudioTracks()[0].enabled = true;
+        sendTalker(myId);
+        isTalking = true;
+        talkBtn.classList.add('talking');
+        status.textContent = '発話中';
+      } else {
+        status.textContent = '他の人が発話中';
+      }
+    }
+
+    function stopTalking() {
+      localStream.getAudioTracks()[0].enabled = false;
+      isTalking = false;
+      talkBtn.classList.remove('talking');
+      if (currentTalker === myId) sendTalker(null);
+      if (isConnected) {
+        status.textContent = '接続完了';
+      }
+    }
+
+    // マウスとタッチ両対応
+    talkBtn.addEventListener('mousedown', startTalking);
+    talkBtn.addEventListener('mouseup', stopTalking);
+    talkBtn.addEventListener('mouseleave', () => {
+      if (isTalking) stopTalking();
+    });
+
+    talkBtn.addEventListener('touchstart', e => {
+      e.preventDefault();
+      startTalking();
+    });
+    talkBtn.addEventListener('touchend', e => {
+      e.preventDefault();
+      stopTalking();
+    });
+
+    init();
+  </script>
+</body>
+</html>
