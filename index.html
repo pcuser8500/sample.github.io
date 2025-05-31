@@ -1,119 +1,33 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-  <meta charset="utf-8">
-  <title>トランシーバー</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="stylesheet" href="style.css">
+    <title>SkyWay</title>
 </head>
 <body>
-  <h1>トランシーバー</h1>
-  <button id="talkBtn">話す</button>
-  <div id="status">接続中...</div>
+    <header><h1 class="header-text">Webトラ!</h1></header>
+    <p id="id-disp">ID: <span id="my-id"></span></p>
+    <p id="Menber-disp">参加人数: <span id="Members">不明</span></p>
+    <div>
+        <!--room name: <input id="room-name" type="text" />-->
+        <button id="join" class="join-btn"><p class="btn-str">接続する</p></button>
+    </div>
 
-  <script>
-    const SKYWAY_API_KEY = '18a3cd31-d2ef-45f0-b675-1584a5a44829'; // ←ここに自分のAPIキーを入れる
-    const ROOM_NAME = 'culture-fes-room';
+    <button id="NonMute-btn" style="touch-action: none; user-select: none;" oncontextmenu="return false;"><p class="btn-str">ミュート解除</p></button>
+    <p id="MuteInfo">接続されていません</p>
+    <p><button id="leave" class="leave-btn">退出</button></p>
+    <div id="button-area"></div>
+    <div id="remote-media-area"></div>
 
-    const talkBtn = document.getElementById('talkBtn');
-    const status = document.getElementById('status');
-
-    let localStream;
-    let peer;
-    let room;
-    let myId = 'user_' + Math.random().toString(36).substr(2, 9);
-    let isTalking = false;
-    let currentTalker = null;
-    let isReady = false;
-
-    async function getStream() {
-      return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    }
-
-    async function init() {
-      try {
-        localStream = await getStream();
-        peer = new Peer({ key: SKYWAY_API_KEY, debug: 1 });
-
-        peer.on('open', () => {
-          room = peer.joinRoom(ROOM_NAME, {
-            mode: 'sfu',
-            stream: localStream
-          });
-
-          room.on('stream', remoteStream => {
-            const audio = new Audio();
-            audio.srcObject = remoteStream;
-            audio.play();
-          });
-
-          room.on('open', () => {
-            status.textContent = '接続完了';
-            isReady = true;
-          });
-
-          room.on('data', ({ src, data }) => {
-            if (data.type === 'talker') {
-              currentTalker = data.id;
-            }
-          });
-
-          setInterval(() => {
-            if (room) {
-              room.send({ type: 'who' });
-            }
-          }, 1000);
-        });
-      } catch (e) {
-        console.error(e);
-        status.textContent = '接続エラー';
-      }
-    }
-
-    function sendTalker(id) {
-      if (room) {
-        room.send({ type: 'talker', id });
-      }
-    }
-
-    function startTalking() {
-      if (!isReady) return;
-      if (!currentTalker || currentTalker === myId) {
-        localStream.getAudioTracks()[0].enabled = true;
-        sendTalker(myId);
-        isTalking = true;
-        talkBtn.classList.add('talking');
-        status.textContent = '発話中';
-      } else {
-        status.textContent = '他の人が発話中';
-      }
-    }
-
-    function stopTalking() {
-      if (!isReady) return;
-      localStream.getAudioTracks()[0].enabled = false;
-      isTalking = false;
-      talkBtn.classList.remove('talking');
-      if (currentTalker === myId) sendTalker(null);
-      status.textContent = '接続完了';
-    }
-
-    talkBtn.addEventListener('mousedown', startTalking);
-    talkBtn.addEventListener('mouseup', stopTalking);
-    talkBtn.addEventListener('mouseleave', () => {
-      if (isTalking) stopTalking();
-    });
-    talkBtn.addEventListener('touchstart', e => {
-      e.preventDefault();
-      startTalking();
-    });
-    talkBtn.addEventListener('touchend', e => {
-      e.preventDefault();
-      stopTalking();
-    });
-
-    init();
-  </script>
+    <div class="Id-Key">
+        <p>Application ID:<input id="App-id" type="text" /></p>
+        <p>Secret Key:<input id="Secret-key" type="text" /></p>
+        <p>Token:<input id="Token" type="text" /></p>
+        <p><button id="save" class="save-btn" onclick="IdKeySave()">保存</button></p>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@skyway-sdk/room/dist/skyway_room-latest.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
