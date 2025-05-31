@@ -4,74 +4,8 @@
   <meta charset="utf-8">
   <title>トランシーバー</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- SkyWay v3のCDN -->
   <script src="https://cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-    html, body {
-      margin: 0;
-      padding: 0;
-      font-family: sans-serif;
-      background-color: #f9f9f9;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-    h1 {
-      margin-bottom: 20px;
-      text-align: center;
-    }
-    #talkBtn {
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 2em;
-      transition: background-color 0.3s;
-      cursor: pointer;
-    }
-    #talkBtn.talking {
-      background-color: #d32f2f;
-    }
-    #status {
-      margin-top: 20px;
-      text-align: center;
-    }
-
-    /* スマホ用 */
-    @media (max-width: 767px) {
-      h1 {
-        font-size: 6vw;
-      }
-      #talkBtn {
-        font-size: 8vw;
-        padding: 6vh 10vw;
-        width: 80%;
-        max-width: 500px;
-      }
-      #status {
-        font-size: 5vw;
-      }
-    }
-
-    /* PC用 */
-    @media (min-width: 768px) {
-      h1 {
-        font-size: 2rem;
-      }
-      #talkBtn {
-        font-size: 1.5rem;
-        padding: 1rem 2rem;
-        width: auto;
-      }
-      #status {
-        font-size: 1.2rem;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <h1>トランシーバー</h1>
@@ -79,7 +13,7 @@
   <div id="status">接続中...</div>
 
   <script>
-    const API_KEY = '18a3cd31-d2ef-45f0-b675-1584a5a44829'; // ← 実際のAPIキーに置き換えてね
+    const SKYWAY_API_KEY = 'YOUR_API_KEY'; // ←ここに自分のAPIキーを入れる
     const ROOM_NAME = 'culture-fes-room';
 
     const talkBtn = document.getElementById('talkBtn');
@@ -91,44 +25,50 @@
     let myId = 'user_' + Math.random().toString(36).substr(2, 9);
     let isTalking = false;
     let currentTalker = null;
-    let joined = false;
+    let isReady = false;
 
     async function getStream() {
       return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     }
 
     async function init() {
-      localStream = await getStream();
+      try {
+        localStream = await getStream();
+        peer = new Peer({ key: SKYWAY_API_KEY, debug: 1 });
 
-      peer = new Peer({ key: API_KEY, debug: 1 });
+        peer.on('open', () => {
+          room = peer.joinRoom(ROOM_NAME, {
+            mode: 'sfu',
+            stream: localStream
+          });
 
-      peer.on('open', function () {
-        room = peer.joinRoom(ROOM_NAME, {
-          mode: 'sfu',
-          stream: localStream
+          room.on('stream', remoteStream => {
+            const audio = new Audio();
+            audio.srcObject = remoteStream;
+            audio.play();
+          });
+
+          room.on('open', () => {
+            status.textContent = '接続完了';
+            isReady = true;
+          });
+
+          room.on('data', ({ src, data }) => {
+            if (data.type === 'talker') {
+              currentTalker = data.id;
+            }
+          });
+
+          setInterval(() => {
+            if (room) {
+              room.send({ type: 'who' });
+            }
+          }, 1000);
         });
-
-        room.on('open', () => {
-          status.textContent = '接続完了';
-          joined = true;
-        });
-
-        room.on('stream', function (remoteStream) {
-          const audio = new Audio();
-          audio.srcObject = remoteStream;
-          audio.play();
-        });
-
-        room.on('data', function ({ src, data }) {
-          if (data.type === 'talker') {
-            currentTalker = data.id;
-          }
-        });
-
-        setInterval(() => {
-          if (room) room.send({ type: 'who' });
-        }, 1000);
-      });
+      } catch (e) {
+        console.error(e);
+        status.textContent = '接続エラー';
+      }
     }
 
     function sendTalker(id) {
@@ -138,8 +78,7 @@
     }
 
     function startTalking() {
-      if (!joined) return;
-
+      if (!isReady) return;
       if (!currentTalker || currentTalker === myId) {
         localStream.getAudioTracks()[0].enabled = true;
         sendTalker(myId);
@@ -152,8 +91,7 @@
     }
 
     function stopTalking() {
-      if (!joined) return;
-
+      if (!isReady) return;
       localStream.getAudioTracks()[0].enabled = false;
       isTalking = false;
       talkBtn.classList.remove('talking');
@@ -161,13 +99,11 @@
       status.textContent = '接続完了';
     }
 
-    // マウス・タッチ両対応
     talkBtn.addEventListener('mousedown', startTalking);
     talkBtn.addEventListener('mouseup', stopTalking);
     talkBtn.addEventListener('mouseleave', () => {
       if (isTalking) stopTalking();
     });
-
     talkBtn.addEventListener('touchstart', e => {
       e.preventDefault();
       startTalking();
