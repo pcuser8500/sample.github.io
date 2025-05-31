@@ -16,6 +16,8 @@ h1 {
   margin-bottom: 20px;
   text-align: center;
 }
+
+/* 通話ボタン */
 #talkBtn {
   background-color: #4CAF50;
   color: white;
@@ -24,9 +26,11 @@ h1 {
   transition: background-color 0.3s;
   cursor: pointer;
 }
+
 #talkBtn.talking {
   background-color: #d32f2f;
 }
+
 #status {
   margin-top: 20px;
   text-align: center;
@@ -56,8 +60,7 @@ h1 {
   #talkBtn {
     font-size: 2rem;
     padding: 2rem 4rem;
-    width: 60%;
-    max-width: 400px;
+    width: auto;
   }
   #status {
     font-size: 1.5rem;
