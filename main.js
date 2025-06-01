@@ -1,15 +1,31 @@
 const { nowInSec, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } = skyway_room;
 
 window.onload = async function () {
-    var Token = localStorage.getItem('Token');
-
-    console.log(Token);
+    await loadAudioDevices();
+    const Token = localStorage.getItem('Token');
     if (Token != "") {
         console.log("Tokenをロードしました");
         await SkyWay_main(String(Token));
     } else {
         alert("認証情報を入力してください");
     }
+}
+
+async function loadAudioDevices() {
+    const audioInputSelect = document.getElementById('audio-input');
+    const audioOutputSelect = document.getElementById('audio-output');
+    const devices = await navigator.mediaDevices.enumerateDevices();
+
+    devices.forEach((device) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.text = device.label || `${device.kind}`;
+        if (device.kind === 'audioinput') {
+            audioInputSelect.appendChild(option);
+        } else if (device.kind === 'audiooutput') {
+            audioOutputSelect.appendChild(option);
+        }
+    });
 }
 
 async function IdKeySave() {
@@ -20,7 +36,6 @@ async function IdKeySave() {
     if (AppId != "" && SecretKey != "") {
         Token = await SkyWay_MakeToken(AppId, SecretKey);
         await localStorage.setItem('Token', Token);
-        console.log("保存済み");
         location.reload();
     } else {
         if (Token != "") {
@@ -79,13 +94,10 @@ function SkyWay_MakeToken(AppId, SecretKey) {
 }
 
 function SkyWay_main(token) {
-    const { nowInSec, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } = skyway_room;
-
     (async () => {
         const buttonArea = document.getElementById('button-area');
         const remoteMediaArea = document.getElementById('remote-media-area');
         const roomNameInput = "transceiver";
-
         var Members = 1;
 
         const myId = document.getElementById('my-id');
@@ -95,20 +107,19 @@ function SkyWay_main(token) {
 
         const target = document.getElementById('MuteInfo');
         const NonMutebtn = document.getElementById('NonMute-btn');
-
         const leavebtn = document.getElementById('leave');
 
         joinButton.onclick = async () => {
-            // 通信容量削減のための低音質マイク設定
+            const selectedMicId = document.getElementById('audio-input').value;
+
             const audio = await SkyWayStreamFactory.createMicrophoneAudioStream({
                 audio: {
+                    deviceId: { exact: selectedMicId },
                     channelCount: 1,
                     sampleRate: 16000,
                     codec: 'opus'
                 }
             });
-
-            if (roomNameInput === '') return;
 
             const context = await SkyWayContext.Create(token);
             const room = await SkyWayRoom.FindOrCreate(context, {
@@ -116,7 +127,6 @@ function SkyWay_main(token) {
                 name: roomNameInput,
             });
             const me = await room.join();
-
             const publication = await me.publish(audio);
             await publication.disable();
             target.textContent = "ミュート中";
@@ -139,7 +149,7 @@ function SkyWay_main(token) {
                 const intervalId = await setInterval(increment, 20)
 
                 document.addEventListener('pointerup', async () => {
-                    await clearInterval(intervalId);
+                    clearInterval(intervalId);
                     await publication.disable();
                     target.textContent = "ミュート中";
                     NonMutebtn.style.backgroundColor = "rgb(147, 235, 235)";
@@ -172,6 +182,14 @@ function SkyWay_main(token) {
                         default:
                             return;
                     }
+
+                    const selectedSpeakerId = document.getElementById('audio-output').value;
+                    if (typeof newMedia.setSinkId === 'function') {
+                        newMedia.setSinkId(selectedSpeakerId).catch((e) => {
+                            console.warn("スピーカーの切り替えに失敗:", e);
+                        });
+                    }
+
                     stream.attach(newMedia);
                     remoteMediaArea.appendChild(newMedia);
                 };
@@ -192,12 +210,9 @@ function SkyWay_main(token) {
     })();
 }
 
-// マイクの権限確認
+// マイク権限確認
 navigator.permissions.query({ name: 'microphone' }).then((result) => {
-    if (result.state === 'granted') {
-        console.log("マイクを利用します");
-    } else {
-        console.log("マイクの権限取得エラーです");
-        alert("マイクを使用する権限を与えて下さい");
+    if (result.state !== 'granted') {
+        alert("マイクの使用を許可してください。");
     }
 });
