@@ -84,11 +84,9 @@ function SkyWay_main(token) {
     (async () => {
         const buttonArea = document.getElementById('button-area');
         const remoteMediaArea = document.getElementById('remote-media-area');
-        //const roomNameInput = document.getElementById('room-name');
         const roomNameInput = "transceiver";
 
         var Members = 1;
-
 
         const myId = document.getElementById('my-id');
         const Memberselem = document.getElementById('Members');
@@ -101,10 +99,14 @@ function SkyWay_main(token) {
         const leavebtn = document.getElementById('leave');
 
         joinButton.onclick = async () => {
-
-            // ここに配置すると、ページをロードしてから参加ボタンを押すまでのマイクON表示を回避可能
-            const audio =
-                await SkyWayStreamFactory.createMicrophoneAudioStream();
+            // 通信容量削減のための低音質マイク設定
+            const audio = await SkyWayStreamFactory.createMicrophoneAudioStream({
+                audio: {
+                    channelCount: 1,
+                    sampleRate: 16000,
+                    codec: 'opus'
+                }
+            });
 
             if (roomNameInput === '') return;
 
@@ -116,7 +118,6 @@ function SkyWay_main(token) {
             const me = await room.join();
 
             const publication = await me.publish(audio);
-
             await publication.disable();
             target.textContent = "ミュート中";
 
@@ -129,13 +130,10 @@ function SkyWay_main(token) {
             joinButton.style.visibility = "hidden";
             leavebtn.style.visibility = "visible";
 
-
             leavebtn.onclick = () => {
                 me.leave();
                 location.reload();
             };
-
-            //window.addEventListener('beforeunload', (e) => {me.leave();const message = '退出します';e.preventDefault();e.returnValue = message;return message;})
 
             NonMutebtn.addEventListener('pointerdown', async () => {
                 const intervalId = await setInterval(increment, 20)
@@ -143,15 +141,12 @@ function SkyWay_main(token) {
                 document.addEventListener('pointerup', async () => {
                     await clearInterval(intervalId);
                     await publication.disable();
-                    const target = document.getElementById('MuteInfo');
                     target.textContent = "ミュート中";
                     NonMutebtn.style.backgroundColor = "rgb(147, 235, 235)";
-                    await publication.disable();
                 }, { once: true });
             });
 
             const increment = async () => {
-                const target = document.getElementById('MuteInfo');
                 target.textContent = "ミュート解除中";
                 NonMutebtn.style.backgroundColor = "red";
                 await publication.enable();
@@ -197,7 +192,7 @@ function SkyWay_main(token) {
     })();
 }
 
-// マイクの権限が与えられているか確認
+// マイクの権限確認
 navigator.permissions.query({ name: 'microphone' }).then((result) => {
     if (result.state === 'granted') {
         console.log("マイクを利用します");
